@@ -41,18 +41,38 @@ export default function LoginForm() {
 
     try {
       // Tentar login
+      console.log("Iniciando tentativa de login...");
       const { error, data } = await signIn(email, password)
       
       if (error) {
+        console.error("Erro detectado no login:", error);
+        let errorMessage = "Email ou senha incorretos.";
+        
+        if (error.message) {
+          // Traduzir mensagens comuns do Supabase
+          if (error.message.includes("Invalid login credentials")) {
+            errorMessage = "Credenciais inválidas. Verifique seu email e senha.";
+          } else if (error.message.includes("Email not confirmed")) {
+            errorMessage = "Email não confirmado. Verifique sua caixa de entrada.";
+          } else if (error.message.includes("User not found")) {
+            errorMessage = "Usuário não encontrado. Verifique seu email ou registre-se.";
+          } else {
+            errorMessage = error.message;
+          }
+        }
+        
         toast({
           title: "Erro de login",
-          description: error.message || "Email ou senha incorretos.",
+          description: errorMessage,
           variant: "destructive",
         })
-        return
+        
+        setIsLoading(false);
+        return;
       }
       
       // Se login bem-sucedido
+      console.log("Login bem-sucedido!", data?.user);
       toast({
         title: "Login bem-sucedido",
         description: "Redirecionando para o dashboard.",
@@ -79,10 +99,10 @@ export default function LoginForm() {
         }
       }
     } catch (error: any) {
-      console.error("Erro durante login:", error)
+      console.error("Exceção durante login:", error)
       toast({
         title: "Erro de sistema",
-        description: "Ocorreu um erro ao processar seu login.",
+        description: "Ocorreu um erro ao processar seu login: " + (error.message || "Erro desconhecido"),
         variant: "destructive",
       })
     } finally {

@@ -32,59 +32,81 @@ export default function RegisterForm() {
       return
     }
 
+    // Validação de senha
+    if (password.length < 6) {
+      toast({
+        title: "Senha fraca",
+        description: "Sua senha deve ter pelo menos 6 caracteres.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
+    console.log("Iniciando registro...")
 
     try {
       const { data, error } = await signUp(email, password)
       
       if (error) {
+        console.error("Erro ao criar conta:", error)
+        let errorMessage = error.message
+        
+        // Traduzir mensagens comuns de erro
+        if (errorMessage.includes("already registered")) {
+          errorMessage = "Este email já está registrado. Tente fazer login."
+        } else if (errorMessage.includes("password")) {
+          errorMessage = "A senha é muito fraca. Use pelo menos 6 caracteres."
+        }
+        
         toast({
           title: "Erro ao criar conta",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         })
-      } else {
-        // Tentar criar perfil (mas não bloqueia o fluxo se falhar)
-        if (data?.user) {
-          try {
-            await createUserProfile(data.user.id, {
-              full_name: fullName,
-              username: username,
-            })
-            
-            // Independente do resultado, mostrar mensagem de sucesso
-            toast({
-              title: "Conta criada com sucesso",
-              description: "Verifique seu email para confirmar o cadastro.",
-            })
-            
-            // Redirecionar para login após o registro
-            router.push("/login")
-          } catch (profileError) {
-            console.error("Erro ao criar perfil:", profileError)
-            
-            // Mesmo com erro no perfil, redirecionar para login
-            toast({
-              title: "Conta criada mas ocorreu um erro",
-              description: "Sua conta foi criada, mas houve um problema com seu perfil. Por favor, faça login.",
-            })
-            router.push("/login")
-          }
-        } else {
+        setIsLoading(false)
+        return
+      }
+      
+      console.log("Conta criada com sucesso:", data)
+      
+      // Tentar criar perfil (mas não bloqueia o fluxo se falhar)
+      if (data?.user) {
+        try {
+          await createUserProfile(data.user.id, {
+            full_name: fullName,
+            username: username,
+          })
+          
           toast({
-            title: "Conta criada com sucesso",
-            description: "Verifique seu email para confirmar o cadastro.",
+            title: "Conta criada com sucesso!",
+            description: "Por favor, verifique seu email para confirmar o cadastro antes de fazer login.",
+          })
+          
+          router.push("/registration-success")
+        } catch (profileError) {
+          console.error("Erro ao criar perfil:", profileError)
+          
+          toast({
+            title: "Conta criada, mas atenção:",
+            description: "Sua conta foi criada, mas houve um problema com seu perfil. Verifique seu email para confirmação e depois complete seu perfil.",
           })
           router.push("/login")
         }
+      } else {
+        toast({
+          title: "Conta criada com sucesso",
+          description: "Por favor, verifique seu email para confirmar o cadastro.",
+        })
+        router.push("/login")
       }
     } catch (error: any) {
+      console.error("Exceção durante registro:", error)
       toast({
         title: "Erro inesperado",
         description: error.message || "Ocorreu um erro ao criar sua conta.",
         variant: "destructive",
       })
-      console.error("Erro completo:", error)
     } finally {
       setIsLoading(false)
     }
@@ -143,7 +165,7 @@ export default function RegisterForm() {
               required
             />
             <p className="text-xs text-gray-500">
-              Sua senha deve ter pelo menos 8 caracteres
+              Sua senha deve ter pelo menos 6 caracteres
             </p>
           </div>
         </CardContent>

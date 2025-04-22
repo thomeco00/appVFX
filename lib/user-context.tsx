@@ -144,11 +144,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   // Função para registro
   const signUp = async (email: string, password: string) => {
     try {
+      // Voltar a usar a confirmação de e-mail
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/login`
+          emailRedirectTo: `${window.location.origin}/login`,
         }
       })
       
@@ -156,6 +157,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         console.error("Erro ao criar conta:", error.message)
         return { error, data: null }
       }
+      
+      console.log("Status de confirmação:", data?.user?.confirmed_at ? "Confirmado" : "Aguardando confirmação")
       
       return { data, error: null }
     } catch (err: any) {
