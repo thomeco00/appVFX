@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "supabase-mcp-server": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@joshuarileydev/supabase-mcp-server",
+        "--config",
+        "{\"supabaseApiKey\":\"sbp_5f5efd705c95a8d58e4a228f143cdeb6fee2ad12\"}"
+      ]
+    },
+    "github": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@smithery-ai/github",
+        "--config",
+        "{\"githubPersonalAccessToken\":\"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s\"}"
+      ]
+    },
+    "supabase": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "sbp_5f5efd705c95a8d58e4a228f143cdeb6fee2ad12"
+      ]
+    }
+  }
+} 
