@@ -219,13 +219,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         // Atualizar estado
         setUser(response.data.user)
         setSession(response.data.session)
+        
+        // Importante: Definir como autenticado ANTES de redirecionar
         setStatus('authenticated')
         
         console.log("UserContext: Redirecionando para dashboard")
-        // Simplificado: redirecionar diretamente para o dashboard sem verificar perfil
+        
+        // Usar um setTimeout para permitir que o estado seja atualizado antes de redirecionar
         setTimeout(() => {
           router.push('/dashboard')
-        }, 500)
+        }, 100)
         
         return { data: response.data, error: null }
       } else {

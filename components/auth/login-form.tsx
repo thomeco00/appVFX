@@ -40,6 +40,13 @@ export default function LoginForm() {
     setGeneralError("")
   }, [password])
 
+  // Garantir que isLoading seja resetado se o status mudar
+  useEffect(() => {
+    if (status === 'unauthenticated' && isLoading) {
+      setIsLoading(false)
+    }
+  }, [status, isLoading])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     console.log("Iniciando tentativa de login...")
@@ -64,73 +71,69 @@ export default function LoginForm() {
     console.log("Definindo isLoading para true")
     setIsLoading(true)
     
-    // Definir variável response fora do try/catch para acesso no finally
-    let loginResponse: any = null
-
     try {
       // Log antes de chamar signIn
       console.log("Chamando função signIn com email:", email)
       
       // Tentar login explicitamente com try/catch
-      loginResponse = await signIn(email, password)
+      const loginResponse = await signIn(email, password)
       console.log("Resposta do signIn:", loginResponse)
       
-      if (loginResponse.error) {
-        console.log("Erro de login detectado:", loginResponse.error)
+      // Verificar primeiro se há erro na resposta
+      if (loginResponse && loginResponse.error) {
+        console.error("Erro detectado na resposta:", loginResponse.error)
         
-        // Identificar o tipo de erro para mostrar mensagem apropriada
-        const errorMsg = loginResponse.error.message?.toLowerCase() || ''
-        console.log("Mensagem de erro:", errorMsg)
+        // Extrair mensagem de erro de forma segura
+        const errorMessage = loginResponse.error.message || 
+                           (typeof loginResponse.error === 'string' ? loginResponse.error : 'Erro desconhecido');
         
-        if (errorMsg.includes("invalid login credentials") || 
-            errorMsg.includes("email/password") ||
-            errorMsg.includes("invalid") ||
-            errorMsg.includes("incorrect")) {
+        console.log("Mensagem de erro bruta:", errorMessage);
+        
+        // Definir mensagem de erro apropriada baseada no conteúdo
+        if (errorMessage.toLowerCase().includes("invalid login credentials") || 
+            errorMessage.toLowerCase().includes("email/password") ||
+            errorMessage.toLowerCase().includes("invalid") ||
+            errorMessage.toLowerCase().includes("incorrect")) {
           setPasswordError("Email ou senha incorretos. Verifique e tente novamente.")
-        } else if (errorMsg.includes("email not confirmed")) {
+        } else if (errorMessage.toLowerCase().includes("email not confirmed")) {
           setEmailError("Verifique seu email para ativar sua conta.")
-        } else if (errorMsg.includes("user not found") || 
-                  errorMsg.includes("no user found")) {
+        } else if (errorMessage.toLowerCase().includes("user not found") || 
+                  errorMessage.toLowerCase().includes("no user found")) {
           setEmailError("Email não cadastrado. Crie uma conta primeiro.")
-        } else if (errorMsg.includes("too many")) {
-          setGeneralError("Muitas tentativas de login. Tente novamente mais tarde.")
-        } else if (errorMsg.includes("network")) {
-          setGeneralError("Erro de conexão. Verifique sua internet e tente novamente.")
         } else {
           // Erro genérico mais amigável
-          console.error("Erro de login detalhado:", loginResponse.error)
-          setGeneralError("Não foi possível fazer login. Verifique suas credenciais e tente novamente.")
+          setGeneralError(errorMessage || "Não foi possível fazer login. Verifique suas credenciais.")
         }
-      } else {
-        console.log("Login bem-sucedido, status atual:", status)
         
-        // Adicionar feedback visual mais claro para o usuário
-        toast({
-          title: "Login bem-sucedido!",
-          description: "Redirecionando para o dashboard...",
-          duration: 3000
-        })
-        
-        // Manter o botão de loading até o redirecionamento ocorrer
-        setTimeout(() => {
-          if (isLoading) {
-            setIsLoading(false)
-          }
-        }, 2000)
-        
-        // Não desativar o loading aqui, deixar ativo até o redirecionamento
-        return
+        // Definindo isLoading para false em caso de erro
+        setIsLoading(false)
+        return;
       }
       
-    } catch (error: any) {
+      // Se não houver erro, proceder com o login bem-sucedido
+      console.log("Login bem-sucedido, status atual:", status)
+      
+      // Adicionar feedback visual mais claro para o usuário
+      toast({
+        title: "Login bem-sucedido!",
+        description: "Redirecionando para o dashboard...",
+        duration: 3000
+      })
+      
+      // Definir um timeout para garantir que o isLoading seja resetado mesmo se o redirecionamento falhar
+      setTimeout(() => {
+        if (isLoading) {
+          console.log("Resetando estado de loading após timeout")
+          setIsLoading(false)
+        }
+      }, 5000)
+      
+    } catch (error) {
       console.error("Exceção no login:", error)
-      setGeneralError("Ocorreu um erro ao processar seu login. Tente novamente.")
-    } finally {
-      // Garantir que o loading seja desativado apenas em caso de erro
-      if (loginResponse?.error) {
-        console.log("Finalizando tentativa de login, definindo isLoading para false")
-        setIsLoading(false)
-      }
+      // Garantir que temos uma mensagem de erro mesmo se o erro não for do tipo esperado
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+      setGeneralError("Ocorreu um erro inesperado: " + errorMessage)
+      setIsLoading(false)
     }
   }
 
@@ -158,6 +161,7 @@ export default function LoginForm() {
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="seu@email.com"
               value={email}
@@ -167,6 +171,7 @@ export default function LoginForm() {
               aria-invalid={emailError ? "true" : "false"}
               aria-describedby={emailError ? "email-error" : undefined}
               className={emailError ? "border-red-500" : ""}
+              autoComplete="email"
             />
             {emailError && <ErrorMessage message={emailError} id="email-error" />}
           </div>
@@ -179,6 +184,7 @@ export default function LoginForm() {
             </div>
             <Input
               id="password"
+              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -187,6 +193,7 @@ export default function LoginForm() {
               aria-invalid={passwordError ? "true" : "false"}
               aria-describedby={passwordError ? "password-error" : undefined}
               className={passwordError ? "border-red-500" : ""}
+              autoComplete="current-password"
             />
             {passwordError && <ErrorMessage message={passwordError} id="password-error" />}
           </div>
