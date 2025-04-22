@@ -26,6 +26,7 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { useUserProgress } from "@/contexts/user-progress-context"
@@ -120,6 +121,15 @@ export default function CalendarPage() {
   // Check if company profile is completed
   const hasCompanyProfile = companyProfileCompleted
 
+  // Passos do processo de geração
+  const steps = [
+    { message: "Analisando perfil da empresa...", duration: 1500 },
+    { message: "Identificando público-alvo...", duration: 2000 },
+    { message: "Definindo estratégia de conteúdo...", duration: 2500 },
+    { message: "Criando calendário personalizado...", duration: 3000 },
+    { message: "Finalizando...", duration: 1000 },
+  ]
+
   // Substitua a função handleGenerateCalendar por esta versão melhorada:
 
   const handleGenerateCalendar = () => {
@@ -133,15 +143,6 @@ export default function CalendarPage() {
     setIsLoadingCalendar(true)
     setLoadingStep(0)
     setLoadingProgress(0)
-
-    // Passos do processo de geração
-    const steps = [
-      { message: "Analisando perfil da empresa...", duration: 1500 },
-      { message: "Identificando público-alvo...", duration: 2000 },
-      { message: "Definindo estratégia de conteúdo...", duration: 2500 },
-      { message: "Criando calendário personalizado...", duration: 3000 },
-      { message: "Finalizando...", duration: 1000 },
-    ]
 
     // Calcular o tempo total
     const totalDuration = steps.reduce((acc, step) => acc + step.duration, 0)
@@ -452,10 +453,310 @@ export default function CalendarPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold">Calendário de Conteúdo</h1>
-        <p className="text-gray-600 mt-2">Esta página está em desenvolvimento</p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Calendário de Conteúdo</h1>
+            <p className="text-gray-600 mt-1">Organize suas publicações para atingir melhores resultados</p>
+          </div>
+          
+          {!showCalendar && (
+            <div className="mt-4 md:mt-0">
+              <Button 
+                onClick={handleGenerateCalendar}
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Gerando Calendário...
+                  </>
+                ) : (
+                  <>
+                    {calendarGenerated ? "Regenerar Calendário" : "Gerar Calendário"} 
+                    <CalendarIcon className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+          
+          {showCalendar && (
+            <div className="mt-4 md:mt-0 flex space-x-2">
+              <Button variant="outline" className="bg-white">
+                <Download className="mr-2 h-4 w-4" />
+                Exportar PDF
+              </Button>
+              <Button variant="outline" className="bg-white">
+                <Share2 className="mr-2 h-4 w-4" />
+                Compartilhar
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        {/* Tela de carregamento */}
+        {isLoadingCalendar && (
+          <div className="bg-white rounded-xl shadow-md p-8 text-center">
+            <div className="max-w-md mx-auto">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.5 }}
+              >
+                <div className="mb-6">
+                  <Loader2 className="h-16 w-16 text-blue-500 mx-auto animate-spin" />
+                </div>
+                
+                <h2 className="text-2xl font-bold mb-3">Gerando seu calendário</h2>
+                <p className="text-gray-600 mb-6">
+                  Estamos analisando seu perfil e criando um calendário personalizado para sua marca.
+                </p>
+                
+                <div className="bg-gray-100 rounded-full h-4 mb-3">
+                  <motion.div
+                    className="bg-blue-500 h-4 rounded-full"
+                    initial={{ width: "0%" }}
+                    animate={{ width: `${loadingProgress}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </div>
+                
+                <p className="text-sm text-gray-500">
+                  {loadingStep < 5 ? steps[loadingStep].message : "Finalizando..."}
+                </p>
+                
+                <div className="mt-10 text-xs text-gray-400">
+                  Isso pode levar alguns instantes...
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+        
+        {/* Mostrar o calendário quando estiver pronto */}
+        {showCalendar && !isLoadingCalendar && (
+          <div>
+            {/* Navegação do mês */}
+            <div className="flex justify-between items-center mb-6">
+              <Button
+                variant="outline"
+                className="bg-white"
+                onClick={goToPreviousMonth}
+                disabled={selectedMonthIndex === 0}
+              >
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Mês Anterior
+              </Button>
+              
+              <h2 className="text-xl font-semibold">
+                {months[currentMonth]} {currentYear}
+              </h2>
+              
+              <Button
+                variant="outline"
+                className="bg-white"
+                onClick={goToNextMonth}
+                disabled={selectedMonthIndex === availableMonths.length - 1}
+              >
+                Próximo Mês
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+            
+            {/* Grade do calendário */}
+            <div className="grid grid-cols-7 gap-4">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={`header-${i}`} className="text-center font-semibold text-gray-700">
+                  {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][i]}
+                </div>
+              ))}
+              
+              {/* Espaços vazios para o início do mês */}
+              {Array.from({ length: new Date(currentYear, currentMonth, 1).getDay() }).map((_, i) => (
+                <div key={`empty-start-${i}`} className="bg-gray-50 rounded-lg h-28"></div>
+              ))}
+              
+              {/* Dias do mês */}
+              {calendarData.map((day) => (
+                <Card
+                  key={day.day}
+                  className={`relative h-28 border hover:border-blue-400 transition-all duration-200 cursor-pointer overflow-hidden ${
+                    completedPosts.includes(day.day) ? "bg-green-50 border-green-300" : "bg-white"
+                  }`}
+                  onClick={() => handleDayClick(day)}
+                >
+                  <CardContent className="p-2">
+                    <div className="flex justify-between items-start">
+                      <div className="text-lg font-semibold">{day.day}</div>
+                      <Badge
+                        className={`${getPostTypeColor(day.type)} flex items-center text-xs font-normal px-2 py-0`}
+                      >
+                        {getPostTypeIcon(day.type)} <span className="ml-1">{day.type}</span>
+                      </Badge>
+                    </div>
+                    <div className="mt-1 text-xs font-medium truncate">{day.title}</div>
+                    <div className="mt-1">
+                      <Badge
+                        className={`${getEngagementColor(day.engagement)} text-xs font-normal px-2 py-0.5`}
+                      >
+                        {day.engagement} engajamento
+                      </Badge>
+                    </div>
+                    
+                    {/* Ícone de concluído */}
+                    <div 
+                      className="absolute right-2 bottom-2 cursor-pointer"
+                      onClick={(e) => togglePostCompletion(day.day, e)}
+                    >
+                      {completedPosts.includes(day.day) ? (
+                        <CheckCircle className="h-6 w-6 text-green-600" />
+                      ) : (
+                        <div className="h-6 w-6 rounded-full border-2 border-gray-300 hover:border-blue-500" />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              
+              {/* Espaços vazios para o final do mês */}
+              {Array.from({
+                length: 
+                  6 * 7 - new Date(currentYear, currentMonth, 1).getDay() - new Date(currentYear, currentMonth + 1, 0).getDate(),
+              }).map((_, i) => (
+                <div key={`empty-end-${i}`} className="bg-gray-50 rounded-lg h-28"></div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+      
+      {/* Dialog para detalhes do dia */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          {selectedDay && (
+            <Tabs defaultValue="overview">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold">{formatDate(selectedDay.day)}</h2>
+                  <div className="flex mt-1 space-x-2">
+                    <Badge className={getPostTypeColor(selectedDay.type)}>
+                      {getPostTypeIcon(selectedDay.type)} {selectedDay.type}
+                    </Badge>
+                    <Badge className={getEngagementColor(selectedDay.engagement)}>
+                      {selectedDay.engagement} engajamento
+                    </Badge>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={completedPosts.includes(selectedDay.day) ? "bg-green-50 text-green-700" : ""}
+                  onClick={() => togglePostCompletion(selectedDay.day)}
+                >
+                  {completedPosts.includes(selectedDay.day) ? (
+                    <>
+                      <CheckCircle className="mr-1 h-4 w-4" /> Concluído
+                    </>
+                  ) : (
+                    "Marcar como concluído"
+                  )}
+                </Button>
+              </div>
+              
+              <TabsList className="mb-4">
+                <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+                <TabsTrigger value="details">Detalhes</TabsTrigger>
+                <TabsTrigger value="script">Roteiro</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="overview">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold mb-1 text-lg">{selectedDay.title}</h3>
+                    <p className="text-gray-600">{selectedDay.description}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-1">Hashtags</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedDay.hashtags.map((tag, index) => (
+                        <Badge key={index} variant="outline" className="bg-gray-50">
+                          <Hash className="h-3 w-3 mr-1" />
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {selectedDay.theme && (
+                    <div>
+                      <h4 className="font-medium mb-1">Tema</h4>
+                      <div className="bg-blue-50 p-3 rounded-md">
+                        <div className="font-medium text-blue-800">{selectedDay.theme.title}</div>
+                        <div className="text-blue-700 text-sm mt-1">{selectedDay.theme.description}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="details">
+                <div className="space-y-4">
+                  {selectedDay.howTo && (
+                    <div>
+                      <h4 className="font-medium mb-2">Ferramentas Recomendadas</h4>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {selectedDay.howTo.tools.map((tool, index) => (
+                          <Badge key={index} className="bg-gray-100 text-gray-800">
+                            {getToolIcon(tool)} <span className="ml-1">{tool}</span>
+                          </Badge>
+                        ))}
+                      </div>
+                      
+                      <h4 className="font-medium mb-2">Instruções</h4>
+                      <p className="text-gray-700">{selectedDay.howTo.instructions}</p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="script">
+                {selectedDay.script && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-medium mb-2">Passos</h4>
+                      <ul className="space-y-2">
+                        {selectedDay.script.steps.map((step, index) => (
+                          <li key={index} className="flex items-start">
+                            <div className="bg-blue-100 text-blue-800 rounded-full h-5 w-5 flex items-center justify-center text-xs mr-2 mt-0.5">
+                              {index + 1}
+                            </div>
+                            <span>{step}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium mb-2">Dicas</h4>
+                      <ul className="space-y-2">
+                        {selectedDay.script.tips.map((tip, index) => (
+                          <li key={index} className="flex items-start">
+                            <Lightbulb className="h-4 w-4 text-amber-500 mr-2 mt-0.5" />
+                            <span>{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
-  );
+  )
 }
 
