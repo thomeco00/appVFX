@@ -8,8 +8,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { useUser } from "@/lib/user-context"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, Mail, Info } from "lucide-react"
 import Link from "next/link"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export default function LoginForm() {
   const [email, setEmail] = useState("")
@@ -18,6 +19,8 @@ export default function LoginForm() {
   const [emailError, setEmailError] = useState("")
   const [passwordError, setPasswordError] = useState("")
   const [generalError, setGeneralError] = useState("")
+  const [emailConfirmationNeeded, setEmailConfirmationNeeded] = useState(false)
+  const [lastAttemptedEmail, setLastAttemptedEmail] = useState("")
   const { signIn, status } = useUser()
   const { toast } = useToast()
   const router = useRouter()
@@ -33,7 +36,10 @@ export default function LoginForm() {
   useEffect(() => {
     setEmailError("")
     setGeneralError("")
-  }, [email])
+    if (email !== lastAttemptedEmail) {
+      setEmailConfirmationNeeded(false)
+    }
+  }, [email, lastAttemptedEmail])
 
   useEffect(() => {
     setPasswordError("")
@@ -47,6 +53,7 @@ export default function LoginForm() {
     setEmailError("")
     setPasswordError("")
     setGeneralError("")
+    setEmailConfirmationNeeded(false)
     
     // Validação básica
     if (!email) {
@@ -60,6 +67,7 @@ export default function LoginForm() {
     }
     
     setIsLoading(true)
+    setLastAttemptedEmail(email)
 
     try {
       // Tentar login
@@ -70,25 +78,25 @@ export default function LoginForm() {
         console.error("Erro detectado no login:", error)
         
         // Identificar o tipo de erro para mostrar no campo correto
-        if (error.message?.includes("Invalid login credentials") || 
-            error.message?.includes("Email not confirmed") || 
-            error.message?.includes("User not found")) {
+        if (error.message?.toLowerCase().includes("invalid login credentials") || 
+            error.message?.toLowerCase().includes("email not confirmed") || 
+            error.message?.toLowerCase().includes("user not found") ||
+            error.message?.toLowerCase().includes("email/password")) {
           
           let errorMessage = "Email ou senha incorretos."
           
-          if (error.message.includes("Invalid login credentials")) {
+          if (error.message.toLowerCase().includes("invalid login credentials") || 
+              error.message.toLowerCase().includes("email/password")) {
             errorMessage = "Credenciais inválidas. Verifique seu email e senha."
-          } else if (error.message.includes("Email not confirmed")) {
+            setPasswordError(errorMessage)
+          } else if (error.message.toLowerCase().includes("email not confirmed") || 
+                    error.message.toLowerCase().includes("confirm")) {
             errorMessage = "Email não confirmado. Verifique sua caixa de entrada ou spam."
             setEmailError(errorMessage)
-          } else if (error.message.includes("User not found")) {
+            setEmailConfirmationNeeded(true)
+          } else if (error.message.toLowerCase().includes("user not found")) {
             errorMessage = "Usuário não encontrado. Verifique seu email ou registre-se."
             setEmailError(errorMessage)
-          }
-          
-          // Para erros relacionados a credenciais, mostrar no campo de senha também
-          if (error.message.includes("Invalid login credentials")) {
-            setPasswordError(errorMessage)
           }
           
           setGeneralError(errorMessage)
@@ -160,7 +168,7 @@ export default function LoginForm() {
     
     return (
       <div className="flex items-center mt-1 text-red-500 text-sm">
-        <AlertCircle className="h-4 w-4 mr-1" />
+        <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
         <span>{message}</span>
       </div>
     )
@@ -174,6 +182,24 @@ export default function LoginForm() {
       </CardHeader>
       <form onSubmit={handleLogin}>
         <CardContent className="space-y-4">
+          {emailConfirmationNeeded && (
+            <Alert className="bg-amber-50 border-amber-200">
+              <Mail className="h-5 w-5 text-amber-600" />
+              <AlertTitle className="text-amber-800">Email não confirmado</AlertTitle>
+              <AlertDescription className="text-amber-700">
+                Parece que você ainda não confirmou seu email. Por favor, verifique sua caixa de entrada 
+                (incluindo spam/lixo eletrônico) e clique no link de confirmação que enviamos para {lastAttemptedEmail}.
+              </AlertDescription>
+              <div className="mt-2">
+                <Button variant="outline" size="sm" className="bg-white border-amber-300 text-amber-800 hover:bg-amber-100 hover:text-amber-900" asChild>
+                  <Link href="/registration-success">
+                    Ver instruções detalhadas
+                  </Link>
+                </Button>
+              </div>
+            </Alert>
+          )}
+          
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -207,14 +233,23 @@ export default function LoginForm() {
             <ErrorMessage message={passwordError} />
           </div>
           
-          {generalError && (
+          {generalError && !emailConfirmationNeeded && (
             <div className="p-3 rounded-md bg-red-50 border border-red-200">
               <div className="flex">
-                <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
                 <span className="text-red-600">{generalError}</span>
               </div>
             </div>
           )}
+
+          <div className="p-3 rounded-md bg-blue-50 border border-blue-100">
+            <div className="flex">
+              <Info className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+              <span className="text-blue-600 text-sm">
+                Lembre-se: Você precisa confirmar seu email após o registro para poder fazer login.
+              </span>
+            </div>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
           <Button type="submit" className="w-full" disabled={isLoading}>

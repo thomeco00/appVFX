@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { useUser } from "@/lib/user-context"
 import { updateUserProfile, createUserProfile } from "@/lib/supabase"
+import { AlertCircle } from "lucide-react"
 
 export default function RegisterForm() {
   const [email, setEmail] = useState("")
@@ -16,14 +17,17 @@ export default function RegisterForm() {
   const [fullName, setFullName] = useState("")
   const [username, setUsername] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
   const { signUp } = useUser()
   const { toast } = useToast()
   const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError("")
     
     if (!email || !password || !fullName || !username) {
+      setError("Por favor, preencha todos os campos obrigatórios.")
       toast({
         title: "Campos obrigatórios",
         description: "Por favor, preencha todos os campos.",
@@ -34,6 +38,7 @@ export default function RegisterForm() {
 
     // Validação de senha
     if (password.length < 6) {
+      setError("Sua senha deve ter pelo menos 6 caracteres.")
       toast({
         title: "Senha fraca",
         description: "Sua senha deve ter pelo menos 6 caracteres.",
@@ -59,6 +64,7 @@ export default function RegisterForm() {
           errorMessage = "A senha é muito fraca. Use pelo menos 6 caracteres."
         }
         
+        setError(errorMessage)
         toast({
           title: "Erro ao criar conta",
           description: errorMessage,
@@ -76,6 +82,7 @@ export default function RegisterForm() {
           await createUserProfile(data.user.id, {
             full_name: fullName,
             username: username,
+            email: email,
           })
           
           toast({
@@ -83,6 +90,8 @@ export default function RegisterForm() {
             description: "Por favor, verifique seu email para confirmar o cadastro antes de fazer login.",
           })
           
+          // Armazenar o email registrado no localStorage para exibir na página de sucesso
+          localStorage.setItem("registeredEmail", email)
           router.push("/registration-success")
         } catch (profileError) {
           console.error("Erro ao criar perfil:", profileError)
@@ -91,17 +100,24 @@ export default function RegisterForm() {
             title: "Conta criada, mas atenção:",
             description: "Sua conta foi criada, mas houve um problema com seu perfil. Verifique seu email para confirmação e depois complete seu perfil.",
           })
-          router.push("/login")
+          
+          // Armazenar o email registrado no localStorage para exibir na página de sucesso
+          localStorage.setItem("registeredEmail", email)
+          router.push("/registration-success")
         }
       } else {
         toast({
           title: "Conta criada com sucesso",
           description: "Por favor, verifique seu email para confirmar o cadastro.",
         })
-        router.push("/login")
+        
+        // Armazenar o email registrado no localStorage para exibir na página de sucesso
+        localStorage.setItem("registeredEmail", email)
+        router.push("/registration-success")
       }
     } catch (error: any) {
       console.error("Exceção durante registro:", error)
+      setError(error.message || "Ocorreu um erro ao criar sua conta.")
       toast({
         title: "Erro inesperado",
         description: error.message || "Ocorreu um erro ao criar sua conta.",
@@ -110,6 +126,18 @@ export default function RegisterForm() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Componente para exibir mensagem de erro
+  const ErrorMessage = ({ message }: { message: string }) => {
+    if (!message) return null
+    
+    return (
+      <div className="flex items-center mt-1 text-red-500 text-sm">
+        <AlertCircle className="h-4 w-4 mr-1" />
+        <span>{message}</span>
+      </div>
+    )
   }
 
   return (
@@ -168,6 +196,12 @@ export default function RegisterForm() {
               Sua senha deve ter pelo menos 6 caracteres
             </p>
           </div>
+
+          {error && (
+            <div className="p-3 rounded-md bg-red-50 border border-red-200">
+              <ErrorMessage message={error} />
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
           <Button type="submit" className="w-full" disabled={isLoading}>

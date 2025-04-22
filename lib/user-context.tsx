@@ -121,6 +121,17 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) {
         console.error('Erro de autenticação:', error.message)
+        
+        // Personalizar mensagens de erro
+        if (error.message.includes('Email not confirmed')) {
+          return { 
+            error: { 
+              ...error, 
+              message: 'Email não confirmado. Por favor, verifique seu email e clique no link de confirmação.' 
+            } 
+          }
+        }
+        
         return { error }
       }
       
