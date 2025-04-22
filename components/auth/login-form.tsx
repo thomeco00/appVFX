@@ -24,7 +24,9 @@ export default function LoginForm() {
   
   // Redirecionar se já estiver autenticado
   useEffect(() => {
+    console.log("Status de autenticação alterado para:", status)
     if (status === 'authenticated') {
+      console.log("Usuário autenticado, redirecionando para dashboard...")
       router.push('/dashboard')
     }
   }, [status, router])
@@ -43,6 +45,7 @@ export default function LoginForm() {
   // Garantir que isLoading seja resetado se o status mudar
   useEffect(() => {
     if (status === 'unauthenticated' && isLoading) {
+      console.log("Resetando isLoading porque status é unauthenticated")
       setIsLoading(false)
     }
   }, [status, isLoading])
@@ -119,6 +122,14 @@ export default function LoginForm() {
         description: "Redirecionando para o dashboard...",
         duration: 3000
       })
+      
+      // Redirecionar imediatamente se o login foi bem-sucedido, independente do status
+      if (loginResponse.data?.user) {
+        console.log("Forçando redirecionamento para dashboard após login bem-sucedido")
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 1000)
+      }
       
       // Definir um timeout para garantir que o isLoading seja resetado mesmo se o redirecionamento falhar
       setTimeout(() => {

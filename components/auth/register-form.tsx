@@ -154,43 +154,51 @@ export default function RegisterForm() {
             <Label htmlFor="fullName">Nome Completo</Label>
             <Input
               id="fullName"
+              name="full_name"
               type="text"
               placeholder="Seu Nome Completo"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
+              autoComplete="name"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="username">Nome de Usuário</Label>
             <Input
               id="username"
+              name="username"
               type="text"
               placeholder="seu_usuario"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
+              autoComplete="username"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="seu@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Senha</Label>
             <Input
               id="password"
+              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="new-password"
             />
             <p className="text-xs text-gray-500">
               Sua senha deve ter pelo menos 6 caracteres
