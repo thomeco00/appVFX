@@ -136,6 +136,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       })
       
       if (error) {
+        console.error("Erro de login:", error.message);
         return { error }
       }
       
@@ -162,11 +163,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
             })
           }
           
-          // Redirecionar após login bem-sucedido
-          await redirectBasedOnProfile(data.user.id)
+          // Não fazemos mais o redirecionamento aqui para evitar duplo redirecionamento
+          // O redirecionamento será feito pelo onAuthStateChange no useEffect
         } catch (profileError) {
-          // Em caso de erro, tentar redirecionar de qualquer forma
-          await redirectBasedOnProfile(data.user.id)
+          console.error("Erro ao verificar perfil:", profileError);
         }
         
         return { data, error: null }
@@ -174,6 +174,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         return { error: { message: 'Falha ao verificar credenciais' } }
       }
     } catch (err) {
+      console.error("Exceção no login:", err);
       return { error: err }
     }
   }

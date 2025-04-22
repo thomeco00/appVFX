@@ -66,8 +66,10 @@ export default function LoginForm() {
       const { error } = await signIn(email, password)
       
       if (error) {
+        console.log("Erro de login detectado:", error);
         // Identificar o tipo de erro para mostrar mensagem apropriada
         const errorMsg = error.message?.toLowerCase() || '';
+        console.log("Mensagem de erro:", errorMsg);
         
         if (errorMsg.includes("invalid login credentials") || 
             errorMsg.includes("email/password") ||
@@ -85,20 +87,13 @@ export default function LoginForm() {
           setGeneralError("Erro de conexão. Verifique sua internet e tente novamente.")
         } else {
           // Erro genérico mais amigável
-          console.error("Erro de login:", error);
+          console.error("Erro de login detalhado:", error);
           setGeneralError("Não foi possível fazer login. Verifique suas credenciais e tente novamente.")
         }
-        
-        setIsLoading(false)
-        return
       }
       
-      // Login bem-sucedido - router.push será acionado pelo useEffect quando status mudar
-      toast({
-        title: "Login realizado com sucesso",
-        description: "Bem-vindo de volta!",
-        duration: 3000
-      })
+      // Em qualquer caso, desativar o loading
+      setIsLoading(false)
       
     } catch (error: any) {
       console.error("Exceção no login:", error);
