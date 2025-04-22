@@ -31,7 +31,7 @@ const getClient = () => {
     // Verificar se a URL do supabase está disponível através do ambiente
     const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     if (!envUrl || envUrl === '') {
-      console.log("UserContext: Variáveis de ambiente não encontradas, usando cliente fallback")
+      console.log("UserContext: Variáveis de ambiente não encontradas, usando cliente fallback com valores hardcoded")
       return browserSupabaseClient || fallbackClient
     }
     
