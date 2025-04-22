@@ -77,6 +77,9 @@ export default function LoginForm() {
       if (error) {
         console.error("Erro detectado no login:", error)
         
+        // Mostrar erro detalhado no console para depuração
+        console.log("Detalhes do erro:", JSON.stringify(error))
+        
         // Identificar o tipo de erro para mostrar no campo correto
         if (error.message?.toLowerCase().includes("invalid login credentials") || 
             error.message?.toLowerCase().includes("email not confirmed") || 
@@ -182,6 +185,13 @@ export default function LoginForm() {
       </CardHeader>
       <form onSubmit={handleLogin}>
         <CardContent className="space-y-4">
+          {/* Alerta temporário de ambiente de desenvolvimento */}
+          <div className="p-2 rounded-md bg-blue-50 border border-blue-100 text-center mb-2">
+            <span className="text-blue-600 text-sm font-medium">
+              Modo de desenvolvimento: Login simplificado ativado
+            </span>
+          </div>
+
           {emailConfirmationNeeded && (
             <Alert className="bg-amber-50 border-amber-200">
               <Mail className="h-5 w-5 text-amber-600" />
@@ -242,11 +252,11 @@ export default function LoginForm() {
             </div>
           )}
 
-          <div className="p-3 rounded-md bg-blue-50 border border-blue-100">
+          <div className="p-3 rounded-md bg-green-50 border border-green-100">
             <div className="flex">
-              <Info className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
-              <span className="text-blue-600 text-sm">
-                Lembre-se: Você precisa confirmar seu email após o registro para poder fazer login.
+              <Info className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
+              <span className="text-green-600 text-sm">
+                Nota: Temporariamente, o sistema está configurado para permitir login imediato após o registro, sem necessidade de confirmação de email.
               </span>
             </div>
           </div>

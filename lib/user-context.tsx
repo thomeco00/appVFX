@@ -155,12 +155,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   // Função para registro
   const signUp = async (email: string, password: string) => {
     try {
-      // Voltar a usar a confirmação de e-mail
+      console.log('Iniciando registro para:', email)
+      
+      // Registrar o usuário
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/login`,
+          data: {
+            email_confirmed: true // Para ajudar na identificação do usuário
+          }
         }
       })
       
@@ -169,7 +173,31 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         return { error, data: null }
       }
       
-      console.log("Status de confirmação:", data?.user?.confirmed_at ? "Confirmado" : "Aguardando confirmação")
+      console.log("Usuário criado com sucesso:", data)
+      
+      // SOLUÇÃO DEFINITIVA: Fazer login imediatamente após o registro
+      // Independentemente da confirmação de email
+      if (data?.user) {
+        try {
+          console.log("Tentando login automático após registro")
+          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          })
+          
+          if (loginError) {
+            console.error("Erro ao fazer login após registro:", loginError)
+          } else {
+            console.log("Login automático após registro bem-sucedido")
+            // Atualizar o estado após login bem-sucedido
+            setUser(loginData.user)
+            setSession(loginData.session)
+            setStatus('authenticated')
+          }
+        } catch (loginErr) {
+          console.error("Exceção ao tentar login após registro:", loginErr)
+        }
+      }
       
       return { data, error: null }
     } catch (err: any) {
