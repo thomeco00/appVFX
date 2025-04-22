@@ -32,6 +32,15 @@ export default function RegistrationSuccessPage() {
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {/* Nota temporária sobre confirmação de email */}
+          <Alert className="bg-green-50 border-green-200">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <AlertTitle className="text-green-800">Confirmação automática ativada</AlertTitle>
+            <AlertDescription className="text-green-700">
+              Você pode fazer login imediatamente. O sistema está com confirmação automática de email ativada.
+            </AlertDescription>
+          </Alert>
+
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
             <div className="flex items-start">
               <Mail className="h-6 w-6 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />

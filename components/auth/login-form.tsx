@@ -8,9 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { useUser } from "@/lib/user-context"
-import { AlertCircle, Mail, Info } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import Link from "next/link"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export default function LoginForm() {
   const [email, setEmail] = useState("")
@@ -19,8 +18,6 @@ export default function LoginForm() {
   const [emailError, setEmailError] = useState("")
   const [passwordError, setPasswordError] = useState("")
   const [generalError, setGeneralError] = useState("")
-  const [emailConfirmationNeeded, setEmailConfirmationNeeded] = useState(false)
-  const [lastAttemptedEmail, setLastAttemptedEmail] = useState("")
   const { signIn, status } = useUser()
   const { toast } = useToast()
   const router = useRouter()
@@ -36,10 +33,7 @@ export default function LoginForm() {
   useEffect(() => {
     setEmailError("")
     setGeneralError("")
-    if (email !== lastAttemptedEmail) {
-      setEmailConfirmationNeeded(false)
-    }
-  }, [email, lastAttemptedEmail])
+  }, [email])
 
   useEffect(() => {
     setPasswordError("")
@@ -53,7 +47,6 @@ export default function LoginForm() {
     setEmailError("")
     setPasswordError("")
     setGeneralError("")
-    setEmailConfirmationNeeded(false)
     
     // Validação básica
     if (!email) {
@@ -67,110 +60,59 @@ export default function LoginForm() {
     }
     
     setIsLoading(true)
-    setLastAttemptedEmail(email)
 
     try {
       // Tentar login
-      console.log("Iniciando tentativa de login...")
-      const { error, data } = await signIn(email, password)
+      const { error } = await signIn(email, password)
       
       if (error) {
-        console.error("Erro detectado no login:", error)
+        // Identificar o tipo de erro para mostrar mensagem apropriada
+        const errorMsg = error.message?.toLowerCase() || '';
         
-        // Mostrar erro detalhado no console para depuração
-        console.log("Detalhes do erro:", JSON.stringify(error))
-        
-        // Identificar o tipo de erro para mostrar no campo correto
-        if (error.message?.toLowerCase().includes("invalid login credentials") || 
-            error.message?.toLowerCase().includes("email not confirmed") || 
-            error.message?.toLowerCase().includes("user not found") ||
-            error.message?.toLowerCase().includes("email/password")) {
-          
-          let errorMessage = "Email ou senha incorretos."
-          
-          if (error.message.toLowerCase().includes("invalid login credentials") || 
-              error.message.toLowerCase().includes("email/password")) {
-            errorMessage = "Credenciais inválidas. Verifique seu email e senha."
-            setPasswordError(errorMessage)
-          } else if (error.message.toLowerCase().includes("email not confirmed") || 
-                    error.message.toLowerCase().includes("confirm")) {
-            errorMessage = "Email não confirmado. Verifique sua caixa de entrada ou spam."
-            setEmailError(errorMessage)
-            setEmailConfirmationNeeded(true)
-          } else if (error.message.toLowerCase().includes("user not found")) {
-            errorMessage = "Usuário não encontrado. Verifique seu email ou registre-se."
-            setEmailError(errorMessage)
-          }
-          
-          setGeneralError(errorMessage)
-          
-          toast({
-            title: "Erro de login",
-            description: errorMessage,
-            variant: "destructive",
-          })
+        if (errorMsg.includes("invalid login credentials") || 
+            errorMsg.includes("email/password") ||
+            errorMsg.includes("invalid") ||
+            errorMsg.includes("incorrect")) {
+          setPasswordError("Email ou senha incorretos. Verifique e tente novamente.")
+        } else if (errorMsg.includes("email not confirmed")) {
+          setEmailError("Verifique seu email para ativar sua conta.")
+        } else if (errorMsg.includes("user not found") || 
+                  errorMsg.includes("no user found")) {
+          setEmailError("Email não cadastrado. Crie uma conta primeiro.")
+        } else if (errorMsg.includes("too many")) {
+          setGeneralError("Muitas tentativas de login. Tente novamente mais tarde.")
+        } else if (errorMsg.includes("network")) {
+          setGeneralError("Erro de conexão. Verifique sua internet e tente novamente.")
         } else {
-          // Erro genérico
-          setGeneralError(error.message || "Erro durante o login")
-          
-          toast({
-            title: "Erro de login",
-            description: error.message || "Erro ao tentar fazer login",
-            variant: "destructive",
-          })
+          // Erro genérico mais amigável
+          console.error("Erro de login:", error);
+          setGeneralError("Não foi possível fazer login. Verifique suas credenciais e tente novamente.")
         }
         
         setIsLoading(false)
         return
       }
       
-      // Se login bem-sucedido
-      console.log("Login bem-sucedido!", data?.user)
+      // Login bem-sucedido - router.push será acionado pelo useEffect quando status mudar
       toast({
-        title: "Login bem-sucedido",
-        description: "Redirecionando para o dashboard.",
+        title: "Login realizado com sucesso",
+        description: "Bem-vindo de volta!",
+        duration: 3000
       })
       
-      // Verificar o progresso do usuário no localStorage
-      const progress = localStorage.getItem("userProgress")
-      
-      if (!progress) {
-        localStorage.setItem(
-          "userProgress",
-          JSON.stringify({
-            companyProfileCompleted: false,
-          })
-        )
-        router.push("/company-profile")
-      } else {
-        const userProgress = JSON.parse(progress)
-        
-        if (!userProgress.companyProfileCompleted) {
-          router.push("/company-profile")
-        } else {
-          router.push("/dashboard")
-        }
-      }
     } catch (error: any) {
-      console.error("Exceção durante login:", error)
-      setGeneralError("Ocorreu um erro inesperado. Tente novamente mais tarde.")
-      
-      toast({
-        title: "Erro de sistema",
-        description: "Ocorreu um erro ao processar seu login: " + (error.message || "Erro desconhecido"),
-        variant: "destructive",
-      })
-    } finally {
+      console.error("Exceção no login:", error);
+      setGeneralError("Ocorreu um erro ao processar seu login. Tente novamente.")
       setIsLoading(false)
     }
   }
 
   // Componente para exibir mensagem de erro
-  const ErrorMessage = ({ message }: { message: string }) => {
+  const ErrorMessage = ({ message, id }: { message: string, id?: string }) => {
     if (!message) return null
     
     return (
-      <div className="flex items-center mt-1 text-red-500 text-sm">
+      <div className="flex items-center mt-1 text-red-500 text-sm" id={id}>
         <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
         <span>{message}</span>
       </div>
@@ -183,33 +125,8 @@ export default function LoginForm() {
         <CardTitle className="text-2xl">Entrar</CardTitle>
         <CardDescription>Acesse sua conta para gerenciar seu calendário de conteúdo</CardDescription>
       </CardHeader>
-      <form onSubmit={handleLogin}>
+      <form onSubmit={handleLogin} aria-label="Formulário de login">
         <CardContent className="space-y-4">
-          {/* Alerta temporário de ambiente de desenvolvimento */}
-          <div className="p-2 rounded-md bg-blue-50 border border-blue-100 text-center mb-2">
-            <span className="text-blue-600 text-sm font-medium">
-              Modo de desenvolvimento: Login simplificado ativado
-            </span>
-          </div>
-
-          {emailConfirmationNeeded && (
-            <Alert className="bg-amber-50 border-amber-200">
-              <Mail className="h-5 w-5 text-amber-600" />
-              <AlertTitle className="text-amber-800">Email não confirmado</AlertTitle>
-              <AlertDescription className="text-amber-700">
-                Parece que você ainda não confirmou seu email. Por favor, verifique sua caixa de entrada 
-                (incluindo spam/lixo eletrônico) e clique no link de confirmação que enviamos para {lastAttemptedEmail}.
-              </AlertDescription>
-              <div className="mt-2">
-                <Button variant="outline" size="sm" className="bg-white border-amber-300 text-amber-800 hover:bg-amber-100 hover:text-amber-900" asChild>
-                  <Link href="/registration-success">
-                    Ver instruções detalhadas
-                  </Link>
-                </Button>
-              </div>
-            </Alert>
-          )}
-          
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -220,9 +137,11 @@ export default function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
               required
+              aria-invalid={emailError ? "true" : "false"}
+              aria-describedby={emailError ? "email-error" : undefined}
               className={emailError ? "border-red-500" : ""}
             />
-            <ErrorMessage message={emailError} />
+            {emailError && <ErrorMessage message={emailError} id="email-error" />}
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -238,28 +157,21 @@ export default function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
               required
+              aria-invalid={passwordError ? "true" : "false"}
+              aria-describedby={passwordError ? "password-error" : undefined}
               className={passwordError ? "border-red-500" : ""}
             />
-            <ErrorMessage message={passwordError} />
+            {passwordError && <ErrorMessage message={passwordError} id="password-error" />}
           </div>
           
-          {generalError && !emailConfirmationNeeded && (
-            <div className="p-3 rounded-md bg-red-50 border border-red-200">
+          {generalError && (
+            <div className="p-3 rounded-md bg-red-50 border border-red-200" role="alert">
               <div className="flex">
                 <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
                 <span className="text-red-600">{generalError}</span>
               </div>
             </div>
           )}
-
-          <div className="p-3 rounded-md bg-green-50 border border-green-100">
-            <div className="flex">
-              <Info className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-              <span className="text-green-600 text-sm">
-                Nota: Temporariamente, o sistema está configurado para permitir login imediato após o registro, sem necessidade de confirmação de email.
-              </span>
-            </div>
-          </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
           <Button type="submit" className="w-full" disabled={isLoading}>
@@ -267,9 +179,9 @@ export default function LoginForm() {
           </Button>
           <div className="text-center text-sm">
             Não tem uma conta?{" "}
-            <a href="/register" className="text-blue-600 hover:underline">
+            <Link href="/register" className="text-blue-600 hover:underline">
               Registre-se
-            </a>
+            </Link>
           </div>
         </CardFooter>
       </form>

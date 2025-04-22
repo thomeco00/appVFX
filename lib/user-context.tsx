@@ -2,9 +2,11 @@
 
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase, getUserProfile } from './supabase'
+import { supabase, getUserProfile, createUserProfile, getCompanyProfile } from './supabase'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/use-toast'
+import { createClient } from '@supabase/supabase-js'
+import { Database } from '../types_db'
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
 
@@ -43,7 +45,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       const { data: { session: currentSession }, error } = await supabase.auth.getSession()
       
       if (error) {
-        console.error('Erro ao obter sessão:', error.message)
         setUser(null)
         setSession(null)
         setStatus('unauthenticated')
@@ -52,7 +53,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       
       // Se não houver sessão, definir como não autenticado
       if (!currentSession) {
-        console.log('Nenhuma sessão ativa encontrada')
         setUser(null)
         setSession(null)
         setStatus('unauthenticated')
@@ -60,16 +60,33 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       }
       
       // Se chegou aqui, a sessão é válida
-      console.log('Sessão encontrada:', currentSession.user.email)
       setUser(currentSession.user)
       setSession(currentSession)
       setStatus('authenticated')
       
     } catch (err) {
-      console.error('Exceção ao verificar autenticação:', err)
       setUser(null)
       setSession(null)
       setStatus('unauthenticated')
+    }
+  }
+
+  // Redirecionamento inteligente baseado no perfil do usuário
+  const redirectBasedOnProfile = async (userId: string) => {
+    try {
+      // Verificar se o perfil de empresa existe
+      const companyProfile = await getCompanyProfile(userId)
+      
+      if (!companyProfile) {
+        // Se não tiver perfil de empresa, redirecionar para criação
+        router.push('/company-profile')
+      } else {
+        // Se já tiver perfil completo, ir para o dashboard
+        router.push('/dashboard')
+      }
+    } catch (error) {
+      // Em caso de erro, ir para o dashboard de qualquer forma
+      router.push('/dashboard')
     }
   }
 
@@ -80,12 +97,13 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     // Configurar listener para mudanças de autenticação
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        console.log('Mudança de estado de autenticação:', event)
-        
         if (event === 'SIGNED_IN' && newSession) {
           setUser(newSession.user)
           setSession(newSession)
           setStatus('authenticated')
+          
+          // Redirecionar com base no perfil quando o login for concluído
+          await redirectBasedOnProfile(newSession.user.id)
         } else if (event === 'SIGNED_OUT') {
           setUser(null)
           setSession(null)
@@ -111,8 +129,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   // Função para login
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('Tentando login com email:', email)
-      
       // Tentar fazer login com Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -120,34 +136,44 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       })
       
       if (error) {
-        console.error('Erro de autenticação:', error.message)
-        
-        // Personalizar mensagens de erro
-        if (error.message.includes('Email not confirmed')) {
-          return { 
-            error: { 
-              ...error, 
-              message: 'Email não confirmado. Por favor, verifique seu email e clique no link de confirmação.' 
-            } 
-          }
-        }
-        
         return { error }
       }
       
       // Se login bem-sucedido, atualizar estado
       if (data.user) {
-        console.log('Login bem-sucedido:', data.user.email)
+        // Atualizar estado ANTES de retornar
         setUser(data.user)
         setSession(data.session)
         setStatus('authenticated')
+        
+        // Verificamos se o perfil do usuário existe e temos informações mínimas necessárias
+        try {
+          const profile = await getUserProfile(data.user.id)
+          
+          // Se não tiver perfil, vamos criar um básico
+          if (!profile) {
+            await createUserProfile(data.user.id, {
+              id: data.user.id,
+              email: data.user.email || email, // Use o email fornecido como fallback
+              username: (data.user.email || email).split('@')[0],
+              full_name: '',
+              avatar_url: '',
+              has_completed_profile: false
+            })
+          }
+          
+          // Redirecionar após login bem-sucedido
+          await redirectBasedOnProfile(data.user.id)
+        } catch (profileError) {
+          // Em caso de erro, tentar redirecionar de qualquer forma
+          await redirectBasedOnProfile(data.user.id)
+        }
+        
         return { data, error: null }
       } else {
-        console.error('Login falhou: nenhum usuário retornado')
         return { error: { message: 'Falha ao verificar credenciais' } }
       }
     } catch (err) {
-      console.error('Exceção durante login:', err)
       return { error: err }
     }
   }
