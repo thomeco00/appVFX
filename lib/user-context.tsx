@@ -152,8 +152,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           setSession(newSession)
           setStatus('authenticated')
           
-          // Redirecionar com base no perfil quando o login for concluído
-          await redirectBasedOnProfile(newSession.user.id)
+          // Não redirecionamos aqui para evitar duplo redirecionamento
+          // O redirecionamento agora é feito diretamente na função signIn
         } else if (event === 'SIGNED_OUT') {
           console.log("UserContext: Usuário desconectado")
           setUser(null)
@@ -221,38 +221,13 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(response.data.session)
         setStatus('authenticated')
         
-        // Verificamos se o perfil do usuário existe e temos informações mínimas necessárias
-        try {
-          console.log("UserContext: Verificando perfil do usuário")
-          const profile = await getUserProfile(response.data.user.id)
-          
-          // Se não tiver perfil, vamos criar um básico
-          if (!profile) {
-            console.log("UserContext: Perfil não encontrado, criando perfil básico")
-            await createUserProfile(response.data.user.id, {
-              id: response.data.user.id,
-              email: response.data.user.email || email,
-              username: (response.data.user.email || email).split('@')[0],
-              full_name: '',
-              avatar_url: '',
-              has_completed_profile: false
-            })
-          }
-          
-          // Redirecionar depois de login bem-sucedido
-          console.log("UserContext: Redirecionando após login")
-          await redirectBasedOnProfile(response.data.user.id)
-          
-          console.log("UserContext: Login processado com sucesso")
-          // Retornar sucesso com os dados
-          return { data: response.data, error: null }
-        } catch (profileError) {
-          console.error("UserContext: Erro ao verificar/criar perfil:", profileError)
-          // Tentar redirecionar de qualquer forma
-          await redirectBasedOnProfile(response.data.user.id)
-          // Mesmo com erro de perfil, o login ainda é válido
-          return { data: response.data, error: null }
-        }
+        console.log("UserContext: Redirecionando para dashboard")
+        // Simplificado: redirecionar diretamente para o dashboard sem verificar perfil
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 500)
+        
+        return { data: response.data, error: null }
       } else {
         console.error("UserContext: Login falhou - sem usuário na resposta")
         setStatus('unauthenticated')
