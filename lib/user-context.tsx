@@ -129,53 +129,78 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   // Função para login
   const signIn = async (email: string, password: string) => {
     try {
+      console.log("UserContext: Iniciando signIn para", email);
+      
+      // Verificar se os parâmetros são válidos
+      if (!email || !password) {
+        console.error("UserContext: Email ou senha vazios");
+        return { error: { message: "Email e senha são obrigatórios" } };
+      }
+      
+      // Definir loading state
+      setStatus('loading');
+      
       // Tentar fazer login com Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
+      console.log("UserContext: Chamando supabase.auth.signInWithPassword");
+      const response = await supabase.auth.signInWithPassword({
         email,
         password
-      })
+      });
       
-      if (error) {
-        console.error("Erro de login:", error.message);
-        return { error }
+      console.log("UserContext: Resposta do supabase:", 
+                  "Erro:", !!response.error, 
+                  "Usuário:", !!response.data?.user);
+      
+      if (response.error) {
+        console.error("UserContext: Erro de login:", response.error.message);
+        // Retornar ao estado não autenticado em caso de erro
+        setStatus('unauthenticated');
+        return { error: response.error };
       }
       
       // Se login bem-sucedido, atualizar estado
-      if (data.user) {
-        // Atualizar estado ANTES de retornar
-        setUser(data.user)
-        setSession(data.session)
-        setStatus('authenticated')
+      if (response.data?.user) {
+        console.log("UserContext: Login bem-sucedido, atualizando estado");
+        // Atualizar estado
+        setUser(response.data.user);
+        setSession(response.data.session);
+        setStatus('authenticated');
         
         // Verificamos se o perfil do usuário existe e temos informações mínimas necessárias
         try {
-          const profile = await getUserProfile(data.user.id)
+          console.log("UserContext: Verificando perfil do usuário");
+          const profile = await getUserProfile(response.data.user.id);
           
           // Se não tiver perfil, vamos criar um básico
           if (!profile) {
-            await createUserProfile(data.user.id, {
-              id: data.user.id,
-              email: data.user.email || email, // Use o email fornecido como fallback
-              username: (data.user.email || email).split('@')[0],
+            console.log("UserContext: Perfil não encontrado, criando perfil básico");
+            await createUserProfile(response.data.user.id, {
+              id: response.data.user.id,
+              email: response.data.user.email || email,
+              username: (response.data.user.email || email).split('@')[0],
               full_name: '',
               avatar_url: '',
               has_completed_profile: false
-            })
+            });
           }
           
-          // Não fazemos mais o redirecionamento aqui para evitar duplo redirecionamento
-          // O redirecionamento será feito pelo onAuthStateChange no useEffect
+          console.log("UserContext: Login processado com sucesso");
+          // Retornar sucesso com os dados
+          return { data: response.data, error: null };
         } catch (profileError) {
-          console.error("Erro ao verificar perfil:", profileError);
+          console.error("UserContext: Erro ao verificar/criar perfil:", profileError);
+          // Mesmo com erro de perfil, o login ainda é válido
+          return { data: response.data, error: null };
         }
-        
-        return { data, error: null }
       } else {
-        return { error: { message: 'Falha ao verificar credenciais' } }
+        console.error("UserContext: Login falhou - sem usuário na resposta");
+        setStatus('unauthenticated');
+        return { error: { message: 'Falha ao verificar credenciais' } };
       }
     } catch (err) {
-      console.error("Exceção no login:", err);
-      return { error: err }
+      console.error("UserContext: Exceção no login:", err);
+      setStatus('unauthenticated');
+      return { error: err };
     }
   }
 

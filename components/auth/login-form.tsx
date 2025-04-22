@@ -42,6 +42,7 @@ export default function LoginForm() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("Iniciando tentativa de login...");
     
     // Limpar erros anteriores
     setEmailError("")
@@ -59,16 +60,23 @@ export default function LoginForm() {
       return
     }
     
+    // Log antes de iniciar o carregamento
+    console.log("Definindo isLoading para true");
     setIsLoading(true)
 
     try {
-      // Tentar login
-      const { error } = await signIn(email, password)
+      // Log antes de chamar signIn
+      console.log("Chamando função signIn com email:", email);
       
-      if (error) {
-        console.log("Erro de login detectado:", error);
+      // Tentar login explicitamente com try/catch
+      const response = await signIn(email, password);
+      console.log("Resposta do signIn:", response);
+      
+      if (response.error) {
+        console.log("Erro de login detectado:", response.error);
+        
         // Identificar o tipo de erro para mostrar mensagem apropriada
-        const errorMsg = error.message?.toLowerCase() || '';
+        const errorMsg = response.error.message?.toLowerCase() || '';
         console.log("Mensagem de erro:", errorMsg);
         
         if (errorMsg.includes("invalid login credentials") || 
@@ -87,17 +95,26 @@ export default function LoginForm() {
           setGeneralError("Erro de conexão. Verifique sua internet e tente novamente.")
         } else {
           // Erro genérico mais amigável
-          console.error("Erro de login detalhado:", error);
+          console.error("Erro de login detalhado:", response.error);
           setGeneralError("Não foi possível fazer login. Verifique suas credenciais e tente novamente.")
         }
+      } else {
+        console.log("Login bem-sucedido, status atual:", status);
+        
+        // Mostramos um toast de sucesso como feedback visual imediato
+        toast({
+          title: "Login bem-sucedido!",
+          description: "Você será redirecionado em instantes...",
+          duration: 5000
+        });
       }
-      
-      // Em qualquer caso, desativar o loading
-      setIsLoading(false)
       
     } catch (error: any) {
       console.error("Exceção no login:", error);
       setGeneralError("Ocorreu um erro ao processar seu login. Tente novamente.")
+    } finally {
+      // Garantir que o loading seja desativado em todos os casos
+      console.log("Finalizando tentativa de login, definindo isLoading para false");
       setIsLoading(false)
     }
   }
