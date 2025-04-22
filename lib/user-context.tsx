@@ -6,7 +6,43 @@ import { supabase, getUserProfile, createUserProfile, getCompanyProfile } from '
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/use-toast'
 import { createClient } from '@supabase/supabase-js'
-import { Database } from '../types_db'
+import { browserSupabaseClient, directLogin, directSignUp } from './browser-supabase'
+
+// IMPORTANTE: Cliente alternativo com valores fixos garantidos
+const FALLBACK_SUPABASE_URL = "https://pmuabkkctsfwquvcyfcx.supabase.co"
+const FALLBACK_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtdWFia2tjdHNmd3F1dmN5ZmN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM0NTA3NTQsImV4cCI6MjA1OTAyNjc1NH0.YaiWUEOu0fL8VSniCW2OCrpZ-bmzJlcp6Djo3Cd6fYE"
+
+const fallbackClient = createClient(
+  FALLBACK_SUPABASE_URL,
+  FALLBACK_SUPABASE_KEY,
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    }
+  }
+)
+
+// Escolher o cliente apropriado - usar fallback se o principal não estiver configurado
+const getClient = () => {
+  // Verificar se o cliente principal tem credenciais definidas
+  try {
+    // Verificar se a URL do supabase está disponível através do ambiente
+    const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!envUrl || envUrl === '') {
+      console.log("UserContext: Variáveis de ambiente não encontradas, usando cliente fallback")
+      return browserSupabaseClient || fallbackClient
+    }
+    
+    console.log("UserContext: Usando cliente Supabase padrão com variáveis de ambiente")
+    return supabase
+  } catch (err) {
+    console.error("UserContext: Erro ao verificar cliente:", err)
+    console.log("UserContext: Usando cliente fallback devido a erro")
+    return browserSupabaseClient || fallbackClient
+  }
+}
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
 
@@ -40,11 +76,14 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   // Carregar usuário e sessão iniciais
   const loadUserAndSession = async () => {
     try {
+      console.log("UserContext: Carregando sessão inicial")
       setStatus('loading')
       
-      const { data: { session: currentSession }, error } = await supabase.auth.getSession()
+      const activeClient = getClient()
+      const { data: { session: currentSession }, error } = await activeClient.auth.getSession()
       
       if (error) {
+        console.error("UserContext: Erro ao carregar sessão:", error.message)
         setUser(null)
         setSession(null)
         setStatus('unauthenticated')
@@ -53,6 +92,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       
       // Se não houver sessão, definir como não autenticado
       if (!currentSession) {
+        console.log("UserContext: Nenhuma sessão ativa encontrada")
         setUser(null)
         setSession(null)
         setStatus('unauthenticated')
@@ -60,11 +100,13 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       }
       
       // Se chegou aqui, a sessão é válida
+      console.log("UserContext: Sessão ativa encontrada para usuário:", currentSession.user.id)
       setUser(currentSession.user)
       setSession(currentSession)
       setStatus('authenticated')
       
     } catch (err) {
+      console.error("UserContext: Exceção ao carregar sessão:", err)
       setUser(null)
       setSession(null)
       setStatus('unauthenticated')
@@ -86,18 +128,26 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (error) {
       // Em caso de erro, ir para o dashboard de qualquer forma
+      console.warn("Erro ao verificar perfil da empresa, redirecionando para dashboard:", error)
       router.push('/dashboard')
     }
   }
 
   // Carregar ao montar o componente
   useEffect(() => {
+    console.log("UserContext: Inicializando provider")
     loadUserAndSession()
 
     // Configurar listener para mudanças de autenticação
-    const { data: authListener } = supabase.auth.onAuthStateChange(
+    const activeClient = getClient()
+    console.log("UserContext: Configurando listener de autenticação")
+    
+    const { data: authListener } = activeClient.auth.onAuthStateChange(
       async (event, newSession) => {
+        console.log("UserContext: Evento de autenticação:", event)
+        
         if (event === 'SIGNED_IN' && newSession) {
+          console.log("UserContext: Usuário autenticado:", newSession.user.id)
           setUser(newSession.user)
           setSession(newSession)
           setStatus('authenticated')
@@ -105,11 +155,13 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           // Redirecionar com base no perfil quando o login for concluído
           await redirectBasedOnProfile(newSession.user.id)
         } else if (event === 'SIGNED_OUT') {
+          console.log("UserContext: Usuário desconectado")
           setUser(null)
           setSession(null)
           setStatus('unauthenticated')
           router.push('/login')
         } else if (event === 'TOKEN_REFRESHED' && newSession) {
+          console.log("UserContext: Token renovado")
           setUser(newSession.user)
           setSession(newSession)
         }
@@ -117,6 +169,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     )
 
     return () => {
+      console.log("UserContext: Desinstalando provider")
       authListener?.subscription.unsubscribe()
     }
   }, [router])
@@ -129,51 +182,53 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   // Função para login
   const signIn = async (email: string, password: string) => {
     try {
-      console.log("UserContext: Iniciando signIn para", email);
+      console.log("UserContext: Tentando login para:", email)
       
-      // Verificar se os parâmetros são válidos
       if (!email || !password) {
-        console.error("UserContext: Email ou senha vazios");
-        return { error: { message: "Email e senha são obrigatórios" } };
+        console.error("UserContext: Email ou senha vazios")
+        return { error: { message: "Email e senha são obrigatórios" } }
       }
       
       // Definir loading state
-      setStatus('loading');
+      setStatus('loading')
       
-      // Tentar fazer login com Supabase
-      console.log("UserContext: Chamando supabase.auth.signInWithPassword");
-      const response = await supabase.auth.signInWithPassword({
+      // Obter cliente ativo
+      const activeClient = getClient()
+      
+      // Tentar login
+      console.log("UserContext: Chamando auth.signInWithPassword")
+      const response = await activeClient.auth.signInWithPassword({
         email,
         password
-      });
+      })
       
-      console.log("UserContext: Resposta do supabase:", 
-                  "Erro:", !!response.error, 
-                  "Usuário:", !!response.data?.user);
+      console.log("UserContext: Resposta do login:", 
+                "Erro:", !!response.error, 
+                "Usuário:", !!response.data?.user)
       
       if (response.error) {
-        console.error("UserContext: Erro de login:", response.error.message);
+        console.error("UserContext: Erro de login:", response.error.message)
         // Retornar ao estado não autenticado em caso de erro
-        setStatus('unauthenticated');
-        return { error: response.error };
+        setStatus('unauthenticated')
+        return { error: response.error }
       }
       
       // Se login bem-sucedido, atualizar estado
       if (response.data?.user) {
-        console.log("UserContext: Login bem-sucedido, atualizando estado");
+        console.log("UserContext: Login bem-sucedido, atualizando estado")
         // Atualizar estado
-        setUser(response.data.user);
-        setSession(response.data.session);
-        setStatus('authenticated');
+        setUser(response.data.user)
+        setSession(response.data.session)
+        setStatus('authenticated')
         
         // Verificamos se o perfil do usuário existe e temos informações mínimas necessárias
         try {
-          console.log("UserContext: Verificando perfil do usuário");
-          const profile = await getUserProfile(response.data.user.id);
+          console.log("UserContext: Verificando perfil do usuário")
+          const profile = await getUserProfile(response.data.user.id)
           
           // Se não tiver perfil, vamos criar um básico
           if (!profile) {
-            console.log("UserContext: Perfil não encontrado, criando perfil básico");
+            console.log("UserContext: Perfil não encontrado, criando perfil básico")
             await createUserProfile(response.data.user.id, {
               id: response.data.user.id,
               email: response.data.user.email || email,
@@ -181,36 +236,45 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
               full_name: '',
               avatar_url: '',
               has_completed_profile: false
-            });
+            })
           }
           
-          console.log("UserContext: Login processado com sucesso");
+          // Redirecionar depois de login bem-sucedido
+          console.log("UserContext: Redirecionando após login")
+          await redirectBasedOnProfile(response.data.user.id)
+          
+          console.log("UserContext: Login processado com sucesso")
           // Retornar sucesso com os dados
-          return { data: response.data, error: null };
+          return { data: response.data, error: null }
         } catch (profileError) {
-          console.error("UserContext: Erro ao verificar/criar perfil:", profileError);
+          console.error("UserContext: Erro ao verificar/criar perfil:", profileError)
+          // Tentar redirecionar de qualquer forma
+          await redirectBasedOnProfile(response.data.user.id)
           // Mesmo com erro de perfil, o login ainda é válido
-          return { data: response.data, error: null };
+          return { data: response.data, error: null }
         }
       } else {
-        console.error("UserContext: Login falhou - sem usuário na resposta");
-        setStatus('unauthenticated');
-        return { error: { message: 'Falha ao verificar credenciais' } };
+        console.error("UserContext: Login falhou - sem usuário na resposta")
+        setStatus('unauthenticated')
+        return { error: { message: 'Falha ao verificar credenciais' } }
       }
     } catch (err) {
-      console.error("UserContext: Exceção no login:", err);
-      setStatus('unauthenticated');
-      return { error: err };
+      console.error("UserContext: Exceção no login:", err)
+      setStatus('unauthenticated')
+      return { error: err }
     }
   }
 
   // Função para registro
   const signUp = async (email: string, password: string) => {
     try {
-      console.log('Iniciando registro para:', email)
+      console.log('UserContext: Iniciando registro para:', email)
+      
+      // Obter cliente ativo
+      const activeClient = getClient()
       
       // Registrar o usuário
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await activeClient.auth.signUp({
         email,
         password,
         options: {
@@ -221,39 +285,39 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       })
       
       if (error) {
-        console.error("Erro ao criar conta:", error.message)
+        console.error("UserContext: Erro ao criar conta:", error.message)
         return { error, data: null }
       }
       
-      console.log("Usuário criado com sucesso:", data)
+      console.log("UserContext: Usuário criado com sucesso:", data)
       
       // SOLUÇÃO DEFINITIVA: Fazer login imediatamente após o registro
       // Independentemente da confirmação de email
       if (data?.user) {
         try {
-          console.log("Tentando login automático após registro")
-          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          console.log("UserContext: Tentando login automático após registro")
+          const { data: loginData, error: loginError } = await activeClient.auth.signInWithPassword({
             email,
             password
           })
           
           if (loginError) {
-            console.error("Erro ao fazer login após registro:", loginError)
+            console.error("UserContext: Erro ao fazer login após registro:", loginError)
           } else {
-            console.log("Login automático após registro bem-sucedido")
+            console.log("UserContext: Login automático após registro bem-sucedido")
             // Atualizar o estado após login bem-sucedido
             setUser(loginData.user)
             setSession(loginData.session)
             setStatus('authenticated')
           }
         } catch (loginErr) {
-          console.error("Exceção ao tentar login após registro:", loginErr)
+          console.error("UserContext: Exceção ao tentar login após registro:", loginErr)
         }
       }
       
       return { data, error: null }
     } catch (err: any) {
-      console.error("Exceção durante registro:", err)
+      console.error("UserContext: Exceção durante registro:", err)
       return { 
         error: { message: err.message || "Erro ao criar conta" }, 
         data: null 
@@ -264,10 +328,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   // Função para logout
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
+      console.log("UserContext: Iniciando logout")
+      const activeClient = getClient()
+      const { error } = await activeClient.auth.signOut()
       
       if (error) {
-        console.error("Erro ao fazer logout:", error.message)
+        console.error("UserContext: Erro ao fazer logout:", error.message)
         toast({
           title: "Erro ao sair",
           description: "Não foi possível finalizar sua sessão. Tente novamente.",
@@ -281,10 +347,11 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(null)
       setStatus('unauthenticated')
       
+      console.log("UserContext: Logout concluído, redirecionando para login")
       // Redirecionar para login
       router.push('/login')
     } catch (err) {
-      console.error("Exceção durante logout:", err)
+      console.error("UserContext: Exceção durante logout:", err)
     }
   }
 
