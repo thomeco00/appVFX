@@ -133,41 +133,45 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
-  // Carregar ao montar o componente
+  // Carregar ao montar o componente e configurar listener
   useEffect(() => {
     console.log("UserContext: Inicializando provider")
-    loadUserAndSession()
-
+    
+    // Primeira carga da sessão
+    loadUserAndSession();
+    
     // Configurar listener para mudanças de autenticação
     const activeClient = getClient()
     console.log("UserContext: Configurando listener de autenticação")
     
+    // Este listener é crucial para manter o estado sincronizado com a autenticação
     const { data: authListener } = activeClient.auth.onAuthStateChange(
       async (event, newSession) => {
         console.log("UserContext: Evento de autenticação:", event)
         
+        // Quando o usuário faz login, atualizar o estado
         if (event === 'SIGNED_IN' && newSession) {
-          console.log("UserContext: Usuário autenticado:", newSession.user.id)
+          console.log("UserContext: Evento SIGNED_IN detectado, atualizando estado")
           setUser(newSession.user)
           setSession(newSession)
           setStatus('authenticated')
-          
-          // Não redirecionamos aqui para evitar duplo redirecionamento
-          // O redirecionamento agora é feito diretamente na função signIn
-        } else if (event === 'SIGNED_OUT') {
-          console.log("UserContext: Usuário desconectado")
+        } 
+        // Quando o usuário faz logout, limpar o estado
+        else if (event === 'SIGNED_OUT') {
+          console.log("UserContext: Evento SIGNED_OUT detectado, limpando estado")
           setUser(null)
           setSession(null)
           setStatus('unauthenticated')
-          router.push('/login')
-        } else if (event === 'TOKEN_REFRESHED' && newSession) {
-          console.log("UserContext: Token renovado")
-          setUser(newSession.user)
+        } 
+        // Atualização de token - manter o estado atual
+        else if (event === 'TOKEN_REFRESHED' && newSession) {
+          console.log("UserContext: Token renovado, atualizando sessão")
           setSession(newSession)
         }
       }
     )
 
+    // Cleanup ao desmontar
     return () => {
       console.log("UserContext: Desinstalando provider")
       authListener?.subscription.unsubscribe()
@@ -179,7 +183,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     await loadUserAndSession()
   }
 
-  // Função para login
+  // Função para login - simplificada para evitar problemas de estado
   const signIn = async (email: string, password: string) => {
     try {
       console.log("UserContext: Tentando login para:", email)
@@ -213,29 +217,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         return { error: response.error }
       }
       
-      // Se login bem-sucedido, atualizar estado
-      if (response.data?.user) {
-        console.log("UserContext: Login bem-sucedido, atualizando estado")
-        // Atualizar estado
-        setUser(response.data.user)
-        setSession(response.data.session)
-        
-        // Importante: Definir como autenticado ANTES de redirecionar
-        setStatus('authenticated')
-        
-        console.log("UserContext: Redirecionando para dashboard")
-        
-        // Usar um setTimeout para permitir que o estado seja atualizado antes de redirecionar
-        setTimeout(() => {
-          router.push('/dashboard')
-        }, 100)
-        
-        return { data: response.data, error: null }
-      } else {
-        console.error("UserContext: Login falhou - sem usuário na resposta")
-        setStatus('unauthenticated')
-        return { error: { message: 'Falha ao verificar credenciais' } }
-      }
+      // Login bem-sucedido - o evento SIGNED_IN do listener onAuthStateChange
+      // irá atualizar o estado automaticamente
+      
+      return { data: response.data, error: null }
     } catch (err) {
       console.error("UserContext: Exceção no login:", err)
       setStatus('unauthenticated')
@@ -269,29 +254,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       
       console.log("UserContext: Usuário criado com sucesso:", data)
       
-      // SOLUÇÃO DEFINITIVA: Fazer login imediatamente após o registro
-      // Independentemente da confirmação de email
-      if (data?.user) {
-        try {
-          console.log("UserContext: Tentando login automático após registro")
-          const { data: loginData, error: loginError } = await activeClient.auth.signInWithPassword({
-            email,
-            password
-          })
-          
-          if (loginError) {
-            console.error("UserContext: Erro ao fazer login após registro:", loginError)
-          } else {
-            console.log("UserContext: Login automático após registro bem-sucedido")
-            // Atualizar o estado após login bem-sucedido
-            setUser(loginData.user)
-            setSession(loginData.session)
-            setStatus('authenticated')
-          }
-        } catch (loginErr) {
-          console.error("UserContext: Exceção ao tentar login após registro:", loginErr)
-        }
-      }
+      // Login automático após registro é opcional, já que o formulário
+      // de registro normalmente redireciona para confirmação ou login
       
       return { data, error: null }
     } catch (err: any) {
@@ -320,14 +284,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         return
       }
       
-      // Limpar estado local
-      setUser(null)
-      setSession(null)
-      setStatus('unauthenticated')
+      // O evento SIGNED_OUT do listener irá limpar o estado
       
-      console.log("UserContext: Logout concluído, redirecionando para login")
-      // Redirecionar para login
-      router.push('/login')
     } catch (err) {
       console.error("UserContext: Exceção durante logout:", err)
     }

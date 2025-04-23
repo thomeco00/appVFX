@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useUser } from "@/lib/user-context"
 import { AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { supabase } from "@/lib/supabase"
 
 export default function LoginForm() {
   const [email, setEmail] = useState("")
@@ -18,18 +19,18 @@ export default function LoginForm() {
   const [emailError, setEmailError] = useState("")
   const [passwordError, setPasswordError] = useState("")
   const [generalError, setGeneralError] = useState("")
-  const { signIn, status } = useUser()
+  const { signIn, status, user } = useUser()
   const { toast } = useToast()
   const router = useRouter()
   
   // Redirecionar se já estiver autenticado
   useEffect(() => {
     console.log("Status de autenticação alterado para:", status)
-    if (status === 'authenticated') {
+    if (status === 'authenticated' && user) {
       console.log("Usuário autenticado, redirecionando para dashboard...")
       router.push('/dashboard')
     }
-  }, [status, router])
+  }, [status, router, user])
 
   // Limpar erros quando os campos mudam
   useEffect(() => {
@@ -75,20 +76,18 @@ export default function LoginForm() {
     setIsLoading(true)
     
     try {
-      // Log antes de chamar signIn
-      console.log("Chamando função signIn com email:", email)
+      // Tentar login diretamente com Supabase para garantir consistência
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
       
-      // Tentar login explicitamente com try/catch
-      const loginResponse = await signIn(email, password)
-      console.log("Resposta do signIn:", loginResponse)
-      
-      // Verificar primeiro se há erro na resposta
-      if (loginResponse && loginResponse.error) {
-        console.error("Erro detectado na resposta:", loginResponse.error)
+      if (error) {
+        console.error("Erro detectado na resposta:", error)
         
         // Extrair mensagem de erro de forma segura
-        const errorMessage = loginResponse.error.message || 
-                           (typeof loginResponse.error === 'string' ? loginResponse.error : 'Erro desconhecido');
+        const errorMessage = error.message || 
+                           (typeof error === 'string' ? error : 'Erro desconhecido');
         
         console.log("Mensagem de erro bruta:", errorMessage);
         
@@ -113,8 +112,8 @@ export default function LoginForm() {
         return;
       }
       
-      // Se não houver erro, proceder com o login bem-sucedido
-      console.log("Login bem-sucedido, status atual:", status)
+      // Se chegarmos aqui, o login foi bem-sucedido
+      console.log("Login bem-sucedido:", data)
       
       // Adicionar feedback visual mais claro para o usuário
       toast({
@@ -123,21 +122,10 @@ export default function LoginForm() {
         duration: 3000
       })
       
-      // Redirecionar imediatamente se o login foi bem-sucedido, independente do status
-      if (loginResponse.data?.user) {
-        console.log("Forçando redirecionamento para dashboard após login bem-sucedido")
-        setTimeout(() => {
-          router.push('/dashboard')
-        }, 1000)
-      }
-      
-      // Definir um timeout para garantir que o isLoading seja resetado mesmo se o redirecionamento falhar
+      // Força redirecionamento direto via window.location para evitar problemas com o router
       setTimeout(() => {
-        if (isLoading) {
-          console.log("Resetando estado de loading após timeout")
-          setIsLoading(false)
-        }
-      }, 5000)
+        window.location.href = "/dashboard";
+      }, 1000);
       
     } catch (error) {
       console.error("Exceção no login:", error)
