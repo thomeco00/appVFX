@@ -1,238 +1,186 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { debugSupabaseClient, checkSupabaseConnection, testAuth, getSupabaseConfig } from '@/lib/debug-supabase'
-import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { useUser } from "@/lib/user-context"
+import { supabase } from "@/lib/supabase"
+import { createClient } from '@supabase/supabase-js'
+import Link from "next/link"
 
 export default function DebugPage() {
-  const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean | null>(null)
-  const [isDirectConnected, setIsDirectConnected] = useState<boolean | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [envVariables, setEnvVariables] = useState({
-    supabaseUrl: "",
-    supabaseKeyPartial: "",
-    usingEnvVars: false
-  })
-  const [isLoading, setIsLoading] = useState(false)
-  const [authStatus, setAuthStatus] = useState<string | null>(null)
-
+  const { user, status, session } = useUser()
+  const [testResult, setTestResult] = useState<string | null>(null)
+  const [testColor, setTestColor] = useState("text-gray-500")
+  const [envVariables, setEnvVariables] = useState<{[key: string]: string | undefined}>({})
+  const [manualUrl, setManualUrl] = useState("")
+  const [manualKey, setManualKey] = useState("")
+  
   useEffect(() => {
-    // Capturar valores das variáveis de ambiente
-    const config = getSupabaseConfig()
+    // Verificar variáveis de ambiente
     setEnvVariables({
-      supabaseUrl: config.url,
-      supabaseKeyPartial: config.keyPartial,
-      usingEnvVars: config.usingEnvVars
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 
+        `${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 8)}...` : undefined
     })
+    
+    // Valores para testar manualmente
+    setManualUrl("https://pmuabkkctsfwquvcyfcx.supabase.co")
+    setManualKey("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtdWFia2tjdHNmd3F1dmN5ZmN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM0NTA3NTQsImV4cCI6MjA1OTAyNjc1NH0.YaiWUEOu0fL8VSniCW2OCrpZ-bmzJlcp6Djo3Cd6fYE")
   }, [])
-
-  const testRegularConnection = async () => {
-    setIsLoading(true)
-    setError(null)
-    
+  
+  const testSupabaseConnection = async () => {
     try {
-      console.log("Testando conexão com o Supabase normal...")
-      const start = Date.now()
+      setTestResult("Testando conexão...")
+      setTestColor("text-blue-500")
       
-      // Tenta uma operação simples no Supabase
-      const { data, error } = await supabase.from('profiles').select('count', { count: 'exact' }).limit(1)
-      
-      const end = Date.now()
-      console.log(`Operação levou ${end - start}ms`)
+      const { data, error } = await supabase.from('profiles').select('*').limit(1)
       
       if (error) {
-        console.error("Erro na conexão:", error)
-        setError(`Erro: ${error.message}`)
-        setIsSupabaseConnected(false)
-      } else {
-        console.log("Conexão bem-sucedida:", data)
-        setIsSupabaseConnected(true)
+        console.error("Erro no teste de conexão:", error)
+        setTestResult(`Erro na conexão: ${error.message}`)
+        setTestColor("text-red-500")
+        return
       }
-    } catch (err: any) {
-      console.error("Exceção ao testar conexão:", err)
-      setError(`Exceção: ${err.message || "Erro desconhecido"}`)
-      setIsSupabaseConnected(false)
-    } finally {
-      setIsLoading(false)
+      
+      setTestResult(`Conexão bem-sucedida! Dados recebidos: ${JSON.stringify(data)}`)
+      setTestColor("text-green-500")
+    } catch (err) {
+      console.error("Exceção no teste:", err)
+      setTestResult(`Exceção: ${err instanceof Error ? err.message : String(err)}`)
+      setTestColor("text-red-500")
     }
   }
-
-  const testDirectConnection = async () => {
-    setIsLoading(true)
-    setError(null)
-    
+  
+  const testManualConnection = async () => {
     try {
-      const result = await checkSupabaseConnection()
+      setTestResult("Testando conexão manual...")
+      setTestColor("text-blue-500")
       
-      if (result.connected) {
-        setIsDirectConnected(true)
-        setError(null)
-      } else {
-        setIsDirectConnected(false)
-        setError(`Erro na conexão direta: ${result.error}`)
-      }
-    } catch (err: any) {
-      console.error("Exceção ao testar conexão direta:", err)
-      setError(`Exceção direta: ${err.message || "Erro desconhecido"}`)
-      setIsDirectConnected(false)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const testAuthConnection = async () => {
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      const result = await testAuth()
-      
-      if (result.success) {
-        setAuthStatus(result.hasSession ? "Sessão ativa encontrada" : "API de auth funcionando, sem sessão ativa")
-      } else {
-        setAuthStatus("Erro na API de autenticação")
-        setError(`Erro de auth: ${result.error}`)
-      }
-    } catch (err: any) {
-      console.error("Exceção ao testar auth:", err)
-      setError(`Exceção auth: ${err.message || "Erro desconhecido"}`)
-      setAuthStatus("Erro ao tentar comunicar com API de auth")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const testSignUp = async () => {
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      // Email temporário para teste
-      const testEmail = `test${Date.now()}@example.com`
-      const testPassword = "password123456"
-      
-      console.log(`Tentando criar usuário de teste: ${testEmail}`)
-      
-      const { data, error } = await debugSupabaseClient.auth.signUp({
-        email: testEmail,
-        password: testPassword,
-        options: {
-          data: {
-            email_confirmed: true
-          }
-        }
-      })
+      const manualClient = createClient(manualUrl, manualKey)
+      const { data, error } = await manualClient.from('profiles').select('*').limit(1)
       
       if (error) {
-        console.error("Erro ao criar usuário de teste:", error)
-        setError(`Erro de registro: ${error.message}`)
-      } else {
-        console.log("Usuário de teste criado:", data)
-        setError(null)
-        alert(`Usuário de teste criado com sucesso: ${testEmail}`)
+        console.error("Erro no teste manual:", error)
+        setTestResult(`Erro na conexão manual: ${error.message}`)
+        setTestColor("text-red-500")
+        return
       }
-    } catch (err: any) {
-      console.error("Exceção ao criar usuário de teste:", err)
-      setError(`Exceção signup: ${err.message || "Erro desconhecido"}`)
-    } finally {
-      setIsLoading(false)
+      
+      setTestResult(`Conexão manual bem-sucedida! Dados recebidos: ${JSON.stringify(data)}`)
+      setTestColor("text-green-500")
+    } catch (err) {
+      console.error("Exceção no teste manual:", err)
+      setTestResult(`Exceção manual: ${err instanceof Error ? err.message : String(err)}`)
+      setTestColor("text-red-500")
     }
   }
-
+  
+  const forceRedirect = () => {
+    window.location.href = "/dashboard"
+  }
+  
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Página de Diagnóstico do Supabase</h1>
-      
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Configuração do Supabase</CardTitle>
-          <CardDescription>
-            {envVariables.usingEnvVars 
-              ? "Usando variáveis de ambiente" 
-              : "Usando valores hardcoded de fallback"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div>
-              <strong>URL do Supabase:</strong> {envVariables.supabaseUrl}
-            </div>
-            <div>
-              <strong>Chave anônima (parcial):</strong> {envVariables.supabaseKeyPartial}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Testes de Conexão</CardTitle>
-          <CardDescription>Verifica se a aplicação consegue se conectar ao Supabase</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={testRegularConnection} disabled={isLoading}>
-                {isLoading ? "Testando..." : "1. Testar Cliente Normal"}
-              </Button>
-              
-              <Button onClick={testDirectConnection} disabled={isLoading} variant="secondary">
-                {isLoading ? "Testando..." : "2. Testar Cliente Hardcoded"}
-              </Button>
-              
-              <Button onClick={testAuthConnection} disabled={isLoading} variant="outline">
-                {isLoading ? "Testando..." : "3. Testar Autenticação"}
-              </Button>
-              
-              <Button onClick={testSignUp} disabled={isLoading} variant="destructive">
-                {isLoading ? "Testando..." : "4. Testar Criação de Usuário"}
-              </Button>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="w-full max-w-3xl space-y-6">
+        <h1 className="text-3xl font-bold text-center">Página de Diagnóstico</h1>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Status de Autenticação</CardTitle>
+            <CardDescription>Informações sobre o estado atual do usuário</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 border rounded-md">
+              <p><strong>Status:</strong> <span className={
+                status === 'authenticated' ? 'text-green-500' : 
+                status === 'loading' ? 'text-yellow-500' : 
+                'text-red-500'
+              }>{status}</span></p>
+              <p><strong>Usuário:</strong> {user ? user.email : 'Nenhum usuário logado'}</p>
+              <p><strong>ID:</strong> {user ? user.id : 'N/A'}</p>
+              <p><strong>Sessão ativa:</strong> {session ? 'Sim' : 'Não'}</p>
+              <p><strong>Token:</strong> {session ? `${session.access_token.substring(0, 8)}...` : 'N/A'}</p>
             </div>
             
-            <div className="mt-4">
-              <h3 className="font-bold">Resultados dos Testes:</h3>
+            <div className="flex space-x-3">
+              <Button onClick={forceRedirect} variant="secondary">
+                Forçar Redirecionamento para Dashboard
+              </Button>
+              <Link href="/login-bypass">
+                <Button variant="outline">
+                  Ir para Login Alternativo
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Variáveis de Ambiente</CardTitle>
+            <CardDescription>Verificação das configurações de ambiente</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 border rounded-md">
+              {Object.entries(envVariables).map(([key, value]) => (
+                <p key={key}><strong>{key}:</strong> {value || 'Não definida'}</p>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Teste de Conexão Supabase</CardTitle>
+            <CardDescription>Testar conexão com o banco de dados</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button onClick={testSupabaseConnection}>
+              Testar Conexão Supabase
+            </Button>
+            
+            {testResult && (
+              <div className={`p-4 border rounded-md ${testColor}`}>
+                <p>{testResult}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Teste com Credenciais Hardcoded</CardTitle>
+            <CardDescription>Testar conexão com credenciais fixas</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="manualUrl">URL do Supabase</Label>
+                <Input 
+                  id="manualUrl" 
+                  value={manualUrl} 
+                  onChange={(e) => setManualUrl(e.target.value)} 
+                />
+              </div>
               
-              <div className="mt-2 space-y-2">
-                {isSupabaseConnected !== null && (
-                  <div className={`p-2 rounded ${isSupabaseConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    Cliente normal: {isSupabaseConnected ? '✅ Conectado' : '❌ Falha na conexão'}
-                  </div>
-                )}
-                
-                {isDirectConnected !== null && (
-                  <div className={`p-2 rounded ${isDirectConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    Cliente hardcoded: {isDirectConnected ? '✅ Conectado' : '❌ Falha na conexão'}
-                  </div>
-                )}
-                
-                {authStatus && (
-                  <div className="p-2 bg-blue-100 text-blue-800 rounded">
-                    Status de autenticação: {authStatus}
-                  </div>
-                )}
-                
-                {error && (
-                  <div className="p-2 bg-yellow-100 text-yellow-800 rounded">
-                    ⚠️ {error}
-                  </div>
-                )}
+              <div className="space-y-2">
+                <Label htmlFor="manualKey">Chave Anônima</Label>
+                <Input 
+                  id="manualKey" 
+                  value={manualKey} 
+                  onChange={(e) => setManualKey(e.target.value)} 
+                />
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <div className="text-sm text-gray-500 mt-8">
-        <p>Instruções para solução de problemas:</p>
-        <ol className="list-decimal list-inside ml-4 space-y-2">
-          <li>Primeiro, teste o cliente normal para ver se as variáveis de ambiente estão funcionando</li>
-          <li>Depois, teste o cliente hardcoded para verificar se o problema está nas variáveis de ambiente</li>
-          <li>Verifique a API de autenticação para confirmar se o erro é específico de auth ou geral</li>
-          <li>Se todos os testes falharem, verifique as permissões CORS no Supabase</li>
-          <li>Verifique também se não há bloqueios de rede ou firewall impedindo a conexão</li>
-        </ol>
+            
+            <Button onClick={testManualConnection}>
+              Testar Conexão Manual
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
